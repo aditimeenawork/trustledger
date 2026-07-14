@@ -6,6 +6,8 @@ from apps.transactions.models import Transaction
 from apps.transactions.serializers import TransactionSerializer
 from apps.transactions.services import create_transaction
 
+from apps.risk_engine.tasks import evaluate_transaction_risk
+
 
 class TransactionViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer
@@ -20,13 +22,14 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return Transaction.objects.select_related("user").filter(user=user)
 
     def perform_create(self, serializer):
-        create_transaction(
-            user=self.request.user,
-            amount=serializer.validated_data["amount"],
-            currency=serializer.validated_data["currency"],
-            device_fingerprint=serializer.validated_data["device_fingerprint"],
-            geo_location=serializer.validated_data["geo_location"],
-        )
+        transaction = create_transaction(
+        user=self.request.user,
+        amount=serializer.validated_data["amount"],
+        currency=serializer.validated_data["currency"],
+        device_fingerprint=serializer.validated_data["device_fingerprint"],
+        geo_location=serializer.validated_data["geo_location"],
+    )
+        evaluate_transaction_risk.delay(transaction.id)
 
     @action(detail=True, methods=["get"])
     def risk(self, request, pk=None):

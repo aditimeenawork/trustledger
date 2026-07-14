@@ -22,8 +22,9 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/accounts/', include('apps.accounts.urls')),
-     path("api/kyc/", include("apps.kyc.urls")),
-     path("api/transactions/", include("apps.transactions.urls")),
+    path("api/kyc/", include("apps.kyc.urls")),
+    path("api/transactions/", include("apps.transactions.urls")),
+    path("api/audit/", include("apps.audit.urls")),
 ]
 
 if settings.DEBUG:

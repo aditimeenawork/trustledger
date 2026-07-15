@@ -1,5 +1,4 @@
 from rest_framework import generics, permissions
-
 from apps.audit.models import RiskEvent
 from apps.audit.serializers import RiskEventSerializer
 

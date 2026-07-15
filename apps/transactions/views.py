@@ -23,12 +23,17 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         transaction = create_transaction(
-        user=self.request.user,
-        amount=serializer.validated_data["amount"],
-        currency=serializer.validated_data["currency"],
-        device_fingerprint=serializer.validated_data["device_fingerprint"],
-        geo_location=serializer.validated_data["geo_location"],
-    )
+            user=self.request.user,
+            amount=serializer.validated_data["amount"],
+            currency=serializer.validated_data["currency"],
+            device_fingerprint=serializer.validated_data["device_fingerprint"],
+            geo_location=serializer.validated_data["geo_location"],
+        )
+
+        serializer.instance = transaction
+
+        from apps.risk_engine.tasks import evaluate_transaction_risk
+
         evaluate_transaction_risk.delay(transaction.id)
 
     @action(detail=True, methods=["get"])

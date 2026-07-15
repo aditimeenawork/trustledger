@@ -154,3 +154,15 @@ CELERY_RESULT_BACKEND = os.environ.get(
     "CELERY_RESULT_BACKEND",
     "redis://localhost:6379/0",
 )
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+EXPLANATIONS_USE_MOCK_LLM = True
+
+EXPLANATION_MODEL_NAME = os.environ.get(
+    "EXPLANATION_MODEL_NAME",
+    "gemini-3.5-flash",
+)
+
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True

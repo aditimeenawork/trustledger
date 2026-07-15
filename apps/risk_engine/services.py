@@ -76,4 +76,8 @@ def evaluate_transaction(transaction_id):
         )
         transaction.save(update_fields=["status"])
 
+        from apps.explanations.tasks import generate_explanation
+
+        db_transaction.on_commit(lambda: generate_explanation.delay(risk_event.id))
+
     return risk_event

@@ -25,6 +25,8 @@ urlpatterns = [
     path("api/kyc/", include("apps.kyc.urls")),
     path("api/transactions/", include("apps.transactions.urls")),
     path("api/audit/", include("apps.audit.urls")),
+    path("api/explanations/", include("apps.explanations.urls")),
+    path("api/webhooks/", include("apps.webhooks.urls")),
 ]
 
 if settings.DEBUG:

@@ -25,7 +25,14 @@ def verify_kyc_document(document):
     document.extracted_data = extracted_data
     document.processed_at = timezone.now()
 
-    profile = document.user.kyc_profile
+    profile, _ = KYCProfile.objects.get_or_create(
+    user=document.user,
+    defaults={
+        "id_type": document.document_type,
+        "id_number_hash": "",
+        "verification_status": KYCProfile.VerificationStatus.PENDING,
+    },
+)
     profile.id_type = document.document_type
     profile.attempt_count += 1
 

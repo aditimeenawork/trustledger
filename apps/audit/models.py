@@ -9,7 +9,7 @@ class RiskEvent(models.Model):
 
     transaction = models.ForeignKey(
         "transactions.Transaction",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="risk_events",
     )
     risk_score = models.FloatField()
@@ -37,3 +37,6 @@ class RiskEvent(models.Model):
 
     def __str__(self):
         return f"RiskEvent(transaction={self.transaction_id}, tier={self.risk_tier}, score={self.risk_score})"
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("RiskEvent records are immutable and cannot be deleted.")

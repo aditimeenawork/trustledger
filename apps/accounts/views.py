@@ -1,7 +1,7 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from apps.accounts.permissions import IsNotReadOnlyAuditor
 from apps.accounts.models import KYCProfile
 from apps.accounts.serializers import (
     KYCProfileSerializer,
@@ -28,7 +28,7 @@ class RegisterView(generics.CreateAPIView):
 
 class MeView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsNotReadOnlyAuditor]
 
     def get_object(self):
         return self.request.user

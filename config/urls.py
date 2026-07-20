@@ -27,6 +27,7 @@ urlpatterns = [
     path("api/audit/", include("apps.audit.urls")),
     path("api/explanations/", include("apps.explanations.urls")),
     path("api/webhooks/", include("apps.webhooks.urls")),
+    path("api/admin/dashboard/", include("apps.dashboard.urls")),
 ]
 
 if settings.DEBUG:

@@ -1,0 +1,9 @@
+DEVELOPER = "Developer"
+COMPLIANCE_OFFICER = "ComplianceOfficer"
+READ_ONLY_AUDITOR = "ReadOnlyAuditor"
+
+PROJECT_ROLES = [
+    DEVELOPER,
+    COMPLIANCE_OFFICER,
+    READ_ONLY_AUDITOR,
+]

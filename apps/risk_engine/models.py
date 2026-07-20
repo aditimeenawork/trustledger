@@ -26,3 +26,11 @@ class RuleTrigger(models.Model):
 
     def __str__(self):
         return f"{self.rule_code} - {self.severity}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError("RuleTrigger records are immutable and cannot be edited.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("RuleTrigger records are immutable and cannot be deleted.")

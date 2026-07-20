@@ -1,22 +1,23 @@
-from rest_framework import permissions, viewsets
+from django.db import transaction as db_transaction
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.accounts.permissions import IsOwnerOrInternalRole, is_internal_user
+from apps.risk_engine.tasks import evaluate_transaction_risk
 from apps.transactions.models import Transaction
 from apps.transactions.serializers import TransactionSerializer
 from apps.transactions.services import create_transaction
 
-from apps.risk_engine.tasks import evaluate_transaction_risk
-
 
 class TransactionViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsOwnerOrInternalRole]
 
     def get_queryset(self):
         user = self.request.user
 
-        if user.is_staff:
+        if is_internal_user(user):
             return Transaction.objects.select_related("user").all()
 
         return Transaction.objects.select_related("user").filter(user=user)
@@ -32,27 +33,14 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
         serializer.instance = transaction
 
-        from apps.risk_engine.tasks import evaluate_transaction_risk
-
-        evaluate_transaction_risk.delay(transaction.id)
+        db_transaction.on_commit(
+            lambda: evaluate_transaction_risk.delay(transaction.id)
+        )
 
     @action(detail=True, methods=["get"])
     def risk(self, request, pk=None):
         transaction = self.get_object()
-
-        risk_events = getattr(transaction, "risk_events", None)
-
-        if risk_events is None:
-            return Response(
-                {
-                    "transaction_id": transaction.id,
-                    "status": transaction.status,
-                    "risk_status": "NOT_EVALUATED",
-                    "detail": "Risk engine has not been connected yet.",
-                }
-            )
-
-        latest_event = risk_events.order_by("-created_at").first()
+        latest_event = transaction.risk_events.order_by("-created_at").first()
 
         if latest_event is None:
             return Response(

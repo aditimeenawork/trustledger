@@ -18,9 +18,7 @@ EXPLANATION_SCHEMA = {
         "recommendation",
     ],
     "properties": {
-        "summary": {
-            "type": "string",
-        },
+        "summary": {"type": "string"},
         "risk_tier": {
             "type": "string",
             "enum": ["LOW", "MEDIUM", "HIGH"],
@@ -59,6 +57,25 @@ The JSON must match this structure:
 
 Structured risk data:
 {risk_data_json}
+"""
+
+
+CORRECTION_PROMPT_TEMPLATE = """
+The previous response was invalid and failed JSON schema validation.
+
+Validation error:
+{validation_error}
+
+Invalid response:
+{invalid_response}
+
+Return ONLY valid JSON matching the required schema.
+Do not include markdown.
+Do not include explanation outside the JSON object.
+Do not invent facts.
+
+Original prompt:
+{original_prompt}
 """
 
 
@@ -166,6 +183,21 @@ def fallback_explanation(risk_event):
     }
 
 
+def build_correction_prompt(original_prompt, invalid_response, validation_error):
+    return CORRECTION_PROMPT_TEMPLATE.format(
+        original_prompt=original_prompt,
+        invalid_response=invalid_response,
+        validation_error=validation_error,
+    )
+
+
+def serialize_llm_attempts(attempts):
+    if len(attempts) == 1 and attempts[0].get("raw_response"):
+        return attempts[0]["raw_response"]
+
+    return json.dumps(attempts, indent=2)
+
+
 def generate_explanation_for_risk_event(risk_event):
     existing_log = getattr(risk_event, "explanation", None)
 
@@ -173,25 +205,72 @@ def generate_explanation_for_risk_event(risk_event):
         return existing_log.parsed_explanation
 
     risk_data = build_risk_data(risk_event)
-    prompt = EXPLANATION_PROMPT_TEMPLATE.format(
+    original_prompt = EXPLANATION_PROMPT_TEMPLATE.format(
         risk_data_json=json.dumps(risk_data, indent=2)
     )
 
+    prompt_used = original_prompt
+    attempts = []
     start = time.time()
 
     try:
-        raw_response = call_llm_api(prompt, risk_data)
+        raw_response = call_llm_api(original_prompt, risk_data)
+        attempts.append(
+            {
+                "attempt": "initial",
+                "raw_response": raw_response,
+            }
+        )
         parsed = validate_and_parse_json(raw_response)
-    except Exception as exc:
-        raw_response = str(exc)
+
+    except ExplanationValidationError as first_error:
+        attempts[-1]["validation_error"] = str(first_error)
+
+        retry_prompt = build_correction_prompt(
+            original_prompt=original_prompt,
+            invalid_response=attempts[-1]["raw_response"],
+            validation_error=str(first_error),
+        )
+        prompt_used = retry_prompt
+
+        try:
+            retry_raw_response = call_llm_api(retry_prompt, risk_data)
+            attempts.append(
+                {
+                    "attempt": "retry",
+                    "raw_response": retry_raw_response,
+                }
+            )
+            parsed = validate_and_parse_json(retry_raw_response)
+
+        except ExplanationValidationError as retry_error:
+            attempts[-1]["validation_error"] = str(retry_error)
+            parsed = fallback_explanation(risk_event)
+
+        except Exception as retry_error:
+            attempts.append(
+                {
+                    "attempt": "retry",
+                    "error": str(retry_error),
+                }
+            )
+            parsed = fallback_explanation(risk_event)
+
+    except Exception as error:
+        attempts.append(
+            {
+                "attempt": "initial",
+                "error": str(error),
+            }
+        )
         parsed = fallback_explanation(risk_event)
 
     latency_ms = int((time.time() - start) * 1000)
 
     log = ExplanationLog.objects.create(
         risk_event=risk_event,
-        prompt_used=prompt,
-        raw_llm_response=raw_response,
+        prompt_used=prompt_used,
+        raw_llm_response=serialize_llm_attempts(attempts),
         parsed_explanation=parsed,
         provider="gemini" if not settings.EXPLANATIONS_USE_MOCK_LLM else "mock",
         model_name=settings.EXPLANATION_MODEL_NAME,
